@@ -1,0 +1,58 @@
+# Start container like so:
+#    LEMUR_DIR=
+#    docker run -it --entrypoint /bin/bash -v $LEMUR_DIR:/usr/src/lemur -w /usr/src/lemur alma87
+# Build:
+#    cd /usr/src/lemur
+#    ./build_plugin.sh
+#
+# Executables saved to /usr/src/lemur/dist
+
+FROM almalinux:8.7
+
+SHELL ["/bin/bash", "-c"]
+
+# It would be great to combine all these ENV into one block, but they aren't interpolated immediately.
+ENV TZ="Etc/UTC" \
+    \
+    USR_INCLUDE="/usr/include" \
+    USR_LIB="/usr/lib" \
+    USR_LOCAL="/usr/local" \
+    \
+    LUSTRE_VER="2.15.1-24-gbaa21ca"
+
+ENV LEMUR_SRC_DIR="/usr/src/lemur" \
+    TEMP_DIR="/tmp/lustre" \
+    \
+    GO_PKG="go1.20.3.linux-amd64.tar.gz" \
+    GO_BIN_FOLDER="${USR_LOCAL}/go"
+
+# These setup the go flags for building lemur.
+ENV PATH="$PATH:${GO_BIN_FOLDER}/bin" \
+    CGO_CFLAGS="-I${USR_INCLUDE}" \
+    CGO_LDFLAGS="-L${USR_LIB}" \
+    GOCACHE="${LEMUR_SRC_DIR}/.cache-go/go-build" \
+    GOPATH="${LEMUR_SRC_DIR}/go"
+
+# install lustre client
+ENV DISTRIB_CODENAME=el8 \
+    REPO_PATH=/etc/yum.repos.d/amlfs.repo
+RUN    rpm --import https://packages.microsoft.com/keys/microsoft.asc \
+    && echo -e "[amlfs]" > ${REPO_PATH} \
+    && echo -e "name=Azure Lustre Packages" >> ${REPO_PATH} \
+    && echo -e "baseurl=https://packages.microsoft.com/yumrepos/amlfs-${DISTRIB_CODENAME}" >> ${REPO_PATH} \
+    && echo -e "enabled=1" >> ${REPO_PATH} \
+    && echo -e "gpgcheck=1" >> ${REPO_PATH} \
+    && echo -e "gpgkey=https://packages.microsoft.com/keys/microsoft.asc" >> ${REPO_PATH} \
+    && dnf install -y lustre-client lustre-client-devel
+
+# Install go.
+RUN    dnf install -y wget \
+    && wget "https://go.dev/dl/${GO_PKG}" \
+    && rm -rf "${GO_BIN_FOLDER}" \
+    && tar -C "${USR_LOCAL}" -xzf "${GO_PKG}"
+
+# Install build dependencies
+RUN    dnf install -y gcc make git
+
+# Cleanup to shrink image.
+RUN    rm -rf "${TEMP_DIR}"

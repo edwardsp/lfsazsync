@@ -6,6 +6,7 @@ storage_sas="$3"
 storage_container="$4"
 ssh_port="$5"
 download_url="$6"
+os_version="$7"
 
 lfs_mount=/amlfs
 
@@ -35,20 +36,54 @@ retry_command() {
     return 1
 }
 
+# publisher: 'Canonical'
+# offer: '0001-com-ubuntu-server-focal'
+# sku: '20_04-lts-gen2'
+# version: 'latest'
+function install_deps_ubuntu_2204 {
+    retry_command "apt update"
+    retry_command "apt install -y mysql-server libmysqlclient-dev libjemalloc2"
+    systemctl enable mysql
+    systemctl start mysql
+
+    retry_command "apt install -y ca-certificates curl apt-transport-https lsb-release gnupg"
+    source /etc/lsb-release
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/ ${DISTRIB_CODENAME} main" | tee /etc/apt/sources.list.d/amlfs.list
+    curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+    retry_command "apt update"
+    retry_command "apt install -y amlfs-lustre-client-2.15.1-24-gbaa21ca=$(uname -r)"
+}
+
+function install_deps_almalinux_87 {
+    retry_command "dnf install -y mysql-server mysql-libs epel-release"
+    retry_command "dnf install -y jemalloc"
+    systemctl enable mysql
+    systemctl start mysql
+
+    rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    DISTRIB_CODENAME=el8
+    REPO_PATH=/etc/yum.repos.d/amlfs.repo
+    echo -e "[amlfs]" > ${REPO_PATH}
+    echo -e "name=Azure Lustre Packages" >> ${REPO_PATH}
+    echo -e "baseurl=https://packages.microsoft.com/yumrepos/amlfs-${DISTRIB_CODENAME}" >> ${REPO_PATH}
+    echo -e "enabled=1" >> ${REPO_PATH}
+    echo -e "gpgcheck=1" >> ${REPO_PATH}
+    echo -e "gpgkey=https://packages.microsoft.com/keys/microsoft.asc" >> ${REPO_PATH}
+    sudo dnf install amlfs-lustre-client-2.15.1_24_gbaa21ca-$(uname -r | sed -e "s/\.$(uname -p)$//" | sed -re 's/[-_]/\./g')-1
+}
+
+if [ "$os_version" == "ubuntu2004" ]; then
+    install_deps_ubuntu_2204
+elif [ "$os_version" == "almalinux87" ]; then
+    install_deps_alma_87
+else
+    echo "Unsupported OS version: $os_version"
+    exit 1
+fi
+
 ###############################################
 # Install dependencies
 ###############################################
-retry_command "apt update"
-retry_command "apt install -y mysql-server libmysqlclient-dev libjemalloc2"
-systemctl enable mysql
-systemctl start mysql
-
-retry_command "apt install -y ca-certificates curl apt-transport-https lsb-release gnupg"
-source /etc/lsb-release
-echo "deb [arch=amd64] https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/ ${DISTRIB_CODENAME} main" | tee /etc/apt/sources.list.d/amlfs.list
-curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
-retry_command "apt update"
-retry_command "apt install -y amlfs-lustre-client-2.15.1-24-gbaa21ca=$(uname -r)"
 
 cd /tmp
 wget $download_url/lemur.tgz

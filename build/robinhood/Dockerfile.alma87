@@ -1,0 +1,43 @@
+# Start container like so:
+#    LEMUR_DIR=
+#    docker run -it --entrypoint /bin/bash -v $LEMUR_DIR:/usr/src/lemur -w /usr/src/lemur alma87
+# Build:
+#    cd /usr/src/lemur
+#    ./build_plugin.sh
+#
+# Executables saved to /usr/src/lemur/dist
+
+FROM almalinux:8.7
+
+SHELL ["/bin/bash", "-c"]
+
+# It would be great to combine all these ENV into one block, but they aren't interpolated immediately.
+ENV TZ="Etc/UTC" \
+    \
+    USR_INCLUDE="/usr/include" \
+    USR_LIB="/usr/lib" \
+    USR_LOCAL="/usr/local" \
+    \
+    LUSTRE_VER="2.15.1-24-gbaa21ca"
+
+# install lustre client
+ENV DISTRIB_CODENAME=el8 \
+    REPO_PATH=/etc/yum.repos.d/amlfs.repo
+RUN    rpm --import https://packages.microsoft.com/keys/microsoft.asc \
+    && echo -e "[amlfs]" > ${REPO_PATH} \
+    && echo -e "name=Azure Lustre Packages" >> ${REPO_PATH} \
+    && echo -e "baseurl=https://packages.microsoft.com/yumrepos/amlfs-${DISTRIB_CODENAME}" >> ${REPO_PATH} \
+    && echo -e "enabled=1" >> ${REPO_PATH} \
+    && echo -e "gpgcheck=1" >> ${REPO_PATH} \
+    && echo -e "gpgkey=https://packages.microsoft.com/keys/microsoft.asc" >> ${REPO_PATH} \
+    && dnf install -y lustre-client lustre-client-devel
+
+# Install robinhood dependencies
+RUN    dnf install -y git automake autoconf libtool glib2-devel libattr-devel mysql-devel mailx \
+    bison flex diffutils patch epel-release
+RUN    dnf groupinstall -y "Development Tools"
+# install epel packages
+RUN    dnf install -y jemalloc-devel
+
+
+

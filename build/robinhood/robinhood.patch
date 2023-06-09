@@ -1,0 +1,222 @@
+diff --git a/Makefile.am b/Makefile.am
+index a4eca067..928cff94 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -8,7 +8,7 @@ SUBDIRS=src scripts tests web_gui man
+ rpm_dir=`pwd`/rpms
+ 
+ if LUSTRE
+-  rpmbuild_opt=--with lustre @LDEFINES@
++  rpmbuild_opt=--nodeps --define="lversion 2.14.0" --with lustre @LDEFINES@
+ if USER_LOVEA
+   # Lustre 2.x only
+   rpmbuild_opt += --with recovtools
+diff --git a/scripts/rbh-config b/scripts/rbh-config
+index 62bbba2f..ee7eaddd 100755
+--- a/scripts/rbh-config
++++ b/scripts/rbh-config
+@@ -178,12 +178,14 @@ function db_config
+ 
+     echo "(notice: user robinhood must have SUPER privilege to create triggers)"
+     mysql --password="$pass_root" $DB_NAME << EOF
+-GRANT USAGE ON $DB_NAME.* TO 'robinhood'@'localhost' IDENTIFIED BY '$pass1' ;
+-GRANT USAGE ON $DB_NAME.* TO 'robinhood'@'$clienthost' IDENTIFIED BY '$pass1' ;
+-GRANT ALL PRIVILEGES ON $DB_NAME.* TO 'robinhood'@'localhost' IDENTIFIED BY '$pass1' ;
+-GRANT ALL PRIVILEGES ON $DB_NAME.* TO 'robinhood'@'$clienthost' IDENTIFIED BY '$pass1' ;
+-GRANT SUPER ON *.* TO 'robinhood'@'localhost' IDENTIFIED BY '$pass1' ;
+-GRANT SUPER ON *.* TO 'robinhood'@'$clienthost' IDENTIFIED BY '$pass1' ;
++CREATE USER 'robinhood'@'localhost' IDENTIFIED BY '$pass1';
++CREATE USER 'robinhood'@'$clienthost' IDENTIFIED BY '$pass1';
++GRANT USAGE ON $DB_NAME.* TO 'robinhood'@'localhost';
++GRANT USAGE ON $DB_NAME.* TO 'robinhood'@'$clienthost';
++GRANT ALL PRIVILEGES ON $DB_NAME.* TO 'robinhood'@'localhost';
++GRANT ALL PRIVILEGES ON $DB_NAME.* TO 'robinhood'@'$clienthost';
++GRANT SUPER ON *.* TO 'robinhood'@'localhost';
++GRANT SUPER ON *.* TO 'robinhood'@'$clienthost';
+ FLUSH PRIVILEGES;
+ SHOW GRANTS FOR 'robinhood'@'$clienthost';
+ EOF
+diff --git a/src/common/lustre_tools.c b/src/common/lustre_tools.c
+index 7cb9a9b1..3b8878d2 100644
+--- a/src/common/lustre_tools.c
++++ b/src/common/lustre_tools.c
+@@ -851,21 +851,23 @@ int Get_pool_usage(const char *poolname, struct statfs *pool_statfs)
+ int lustre_mds_stat(const char *fullpath, int parentfd, struct stat *inode)
+ {
+     /* this buffer must be large enough for handling filename */
+-    char buffer[1024];
+-    struct lov_user_mds_data *lmd = (struct lov_user_mds_data *)buffer;
++    char buffer[MAXPATHLEN];
++    struct lov_user_mds_data_v1 *lmd = (struct lov_user_mds_data_v1 *)buffer;
+     const char *filename;
+     int rc;
+ 
++    memset(buffer, 0, sizeof(buffer));
++
+     /* sanity checks */
+     if ((fullpath == NULL) || (inode == NULL))
+         return EINVAL;
+ 
+     filename = rh_basename(fullpath);
+-
+     memset(lmd, 0, sizeof(buffer));
+-    rh_strncpy(buffer, filename, strlen(filename) + 1);
+ 
+-    rc = ioctl(parentfd, IOC_MDC_GETFILEINFO, (void *)lmd);
++    rh_strncpy(buffer, filename, sizeof(buffer)-1);
++
++    rc = ioctl(parentfd, IOC_MDC_GETFILEINFO_V1, (void *)lmd);
+     if (rc < 0)
+         rc = -errno;
+ 
+@@ -908,10 +910,12 @@ static pthread_mutex_t dir_lock = PTHREAD_MUTEX_INITIALIZER;
+ int lustre_mds_stat_by_fid(const entry_id_t *p_id, struct stat *inode)
+ {
+     char filename[MAXNAMLEN];
+-    char buffer[1024];
+-    struct lov_user_mds_data *lmd = (struct lov_user_mds_data *)buffer;
++    char buffer[MAXPATHLEN];
++    struct lov_user_mds_data_v1 *lmd = (struct lov_user_mds_data_v1 *)buffer;
+     int rc;
+ 
++    memset(filename, 0, sizeof(filename));
++
+     /* ensure fid directory is opened */
+     if (fid_dir_fd == NULL) {
+         P(dir_lock);
+@@ -935,11 +939,11 @@ int lustre_mds_stat_by_fid(const entry_id_t *p_id, struct stat *inode)
+             return errno;
+     }
+ 
+-    sprintf(filename, DFID, PFID(p_id));
++    snprintf(filename, sizeof(filename)-1, DFID, PFID(p_id));
+     memset(lmd, 0, sizeof(buffer));
+-    rh_strncpy(buffer, filename, strlen(filename) + 1);
++    rh_strncpy(buffer, filename, MAXNAMLEN);
+ 
+-    rc = ioctl(dirfd(fid_dir_fd), IOC_MDC_GETFILEINFO, (void *)lmd);
++    rc = ioctl(dirfd(fid_dir_fd), IOC_MDC_GETFILEINFO_V1, (void *)lmd);
+ 
+     if (rc) {
+         if (errno == ENOTTY) {
+diff --git a/src/list_mgr/mysql_wrapper.c b/src/list_mgr/mysql_wrapper.c
+index cd3da902..a60592bc 100644
+--- a/src/list_mgr/mysql_wrapper.c
++++ b/src/list_mgr/mysql_wrapper.c
+@@ -115,7 +115,7 @@ bool db_is_retryable(int db_err)
+ /* create client connection */
+ int db_connect(db_conn_t *conn)
+ {
+-    my_bool reconnect = 1;
++    bool reconnect = 1;
+     unsigned int retry = 0;
+ 
+     /* Connect to database */
+diff --git a/src/modules/backup.c b/src/modules/backup.c
+index ef024e20..590d653a 100644
+--- a/src/modules/backup.c
++++ b/src/modules/backup.c
+@@ -568,9 +568,17 @@ static int move_orphan(const char *path)
+     char dest[RBH_PATH_MAX];
+     const char *fname;
+     int rc;
++    int cnt;
+ 
+     /* does the trash directory exist? */
+-    sprintf(dest, "%s/%s", config.root, TRASH_DIR);
++    cnt = snprintf(dest, RBH_PATH_MAX, "%s/%s", config.root, TRASH_DIR);
++    if (cnt < 0 || cnt >= RBH_PATH_MAX) {
++       rc = -EINVAL;
++        DisplayLog(LVL_MAJOR, TAG, "Error creating directory, path too long %s/%s: %s",
++                   config.root, TRASH_DIR, strerror(-rc));
++       return rc;
++    }
++
+     if ((mkdir(dest, 0750) != 0) && (errno != EEXIST)) {
+         rc = -errno;
+         DisplayLog(LVL_MAJOR, TAG, "Error creating directory %s: %s",
+@@ -584,7 +592,13 @@ static int move_orphan(const char *path)
+         return -EINVAL;
+     }
+     /* move the orphan to the directory */
+-    snprintf(dest, RBH_PATH_MAX, "%s/%s/%s", config.root, TRASH_DIR, fname);
++    cnt = snprintf(dest, RBH_PATH_MAX, "%s/%s/%s", config.root, TRASH_DIR, fname);
++    if (cnt < 0 || cnt >= RBH_PATH_MAX) {
++       rc = -EINVAL;
++        DisplayLog(LVL_MAJOR, TAG, "Error creating directory, path too long %s/%s/%s: %s",
++                   config.root, TRASH_DIR, fname, strerror(-rc));
++       return rc;
++    }
+ 
+     if (rename(path, dest) != 0) {
+         rc = -errno;
+@@ -1160,6 +1174,7 @@ static int get_orig_dir_md(const char *target_dir, struct stat *st,
+     int rc;
+     const char *dest_root;
+     const char *src_root;
++    int cnt;
+ 
+     if (target == TO_BACKEND) {
+         dest_root = config.root;
+@@ -1174,7 +1189,13 @@ static int get_orig_dir_md(const char *target_dir, struct stat *st,
+         return rc;
+ 
+     /* orig path is '<fs_root>/<rel_path>' */
+-    sprintf(orig_path, "%s/%s", src_root, rel_path);
++    cnt = snprintf(orig_path, RBH_PATH_MAX, "%s/%s", src_root, rel_path);
++    if (cnt < 0 || cnt >= RBH_PATH_MAX) {
++        DisplayLog(LVL_MAJOR, TAG, "Error stating file, path too long %s/%s: %s",
++                   src_root, rel_path, strerror(-rc));
++       rc = -EINVAL;
++       return rc;
++    }
+ 
+     DisplayLog(LVL_FULL, TAG, "Target directory: %s, source directory: %s",
+                target_dir, orig_path);
+@@ -1513,7 +1534,7 @@ static void path_replace(struct attr_save *save, attr_set_t *p_attrs,
+         strdup(ATTR(p_attrs, fullpath)) : NULL;
+ 
+     ATTR_MASK_SET(p_attrs, fullpath);
+-    strncpy(ATTR(p_attrs, fullpath), path, sizeof(ATTR(p_attrs, fullpath)));
++    strncpy(ATTR(p_attrs, fullpath), path, sizeof(ATTR(p_attrs, fullpath)) - 1);
+ }
+ 
+ /**
+@@ -1546,7 +1567,7 @@ static int wrap_file_copy(sm_instance_t *smi,
+     action_params_t tmp_params = { 0 };
+ 
+     /* build tmp copy path */
+-    asprintf(&tmp, "%s.%s", bkpath, COPY_EXT);
++    rc = asprintf(&tmp, "%s.%s", bkpath, COPY_EXT);
+     if (!tmp)
+         return -ENOMEM;
+ 
+diff --git a/src/tools/lhsmtool_cmd.c b/src/tools/lhsmtool_cmd.c
+index 13410861..a9a1af09 100644
+--- a/src/tools/lhsmtool_cmd.c
++++ b/src/tools/lhsmtool_cmd.c
+@@ -167,10 +167,13 @@ static inline double ct_now(void)
+ 	return tv.tv_sec + 0.000001 * tv.tv_usec;
+ }
+ 
++/* glibc 2.30 adds gettid() in unistd_ext.h which is pulled in via unistd.h */
++#if (!defined(_GNU_SOURCE)) || (__GLIBC__ < 2) || ((__GLIBC__ >= 2) && (__GLIBC_MINOR__ < 30))
+ static inline pid_t gettid(void)
+ {
+ 	return syscall(SYS_gettid);
+ }
++#endif
+ 
+ #define LOG_ERROR(_rc, _format, ...)					\
+ 	llapi_error(LLAPI_MSG_ERROR, _rc,				\
+@@ -587,6 +590,10 @@ static int ct_hsm_io_cmd(const enum hsm_copytool_action hsma, GMainLoop *loop,
+ 	cb_args->fd = llapi_hsm_action_get_fd(cb_args->hcp);
+ 
+ 	rc = ct_build_cmd(hsma, &cmd, hai, cb_args->fd);
++	if (rc < 0) {
++	    err_major++;
++	    goto out;
++	}
+ 	LOG_DEBUG("Running %s command: '%s'", hsma_name, cmd);
+ 	if (opt.o_dry_run || rc == -ENOSYS) {
+ 		err_major++;
