@@ -1,12 +1,3 @@
-# Start container like so:
-#    LEMUR_DIR=
-#    docker run -it --entrypoint /bin/bash -v $LEMUR_DIR:/usr/src/lemur -w /usr/src/lemur alma87
-# Build:
-#    cd /usr/src/lemur
-#    ./build_plugin.sh
-#
-# Executables saved to /usr/src/lemur/dist
-
 FROM almalinux:8.7
 
 SHELL ["/bin/bash", "-c"]

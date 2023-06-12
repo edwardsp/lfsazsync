@@ -44,7 +44,7 @@ resource lfsazsyncnic 'Microsoft.Network/networkInterfaces@2020-06-01' = {
   }
 }
 
-var imagerefs = {
+var imageRef = {
   ubuntu2004: {
     publisher: 'Canonical'
     offer: '0001-com-ubuntu-server-focal'
@@ -59,12 +59,22 @@ var imagerefs = {
   }
 }
 
+var imagePlans = {
+  ubuntu2004: {}
+  almalinux87: {
+    publisher: 'almalinux'
+    product: 'almalinux'
+    name: '8-gen2'
+  }
+}
+
 resource lfsazsyncvm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
   name: 'lfsazsync-vm'
   location: location
   identity: {
     type: 'SystemAssigned'
   }
+  plan: imagePlans[os]
   properties: {
     hardwareProfile: {
       vmSize: vmsku
@@ -78,7 +88,7 @@ resource lfsazsyncvm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
         caching: 'ReadWrite'
         diskSizeGB: 64
       }
-      imageReference: imagerefs[os]
+      imageReference: imageRef[os]
     }
     networkProfile: {
       networkInterfaces: [

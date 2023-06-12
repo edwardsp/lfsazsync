@@ -10,14 +10,23 @@ os_version="$7"
 
 lfs_mount=/amlfs
 
+# we still need to disable selinux for the lustremetasync to work
+if [ "$os_version" == "almalinux87" ]; then
+    setenforce 0
+    sed -i 's/SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
+fi
+
 # change ssh port
-sed -i "s/^#Port 22/Port $ssh_port/" /etc/ssh/sshd_config
-systemctl restart sshd
+if [ "$ssh_port" != "22" ]; then  
+    sed -i "s/^#Port 22/Port $ssh_port/" /etc/ssh/sshd_config
+    systemctl restart sshd
+fi
 
 retry_command() {
     local cmd=$1
     local retries=${2:-5}
     local delay=${3:-10}
+    local pre_retry_cmd=${4:-""}
 
     for ((i=0; i<retries; i++)); do
         echo "Running command: $cmd"
@@ -27,13 +36,18 @@ retry_command() {
             echo "Command succeeded!"
             return 0
         else
+            if [ -n "$pre_retry_cmd" ]; then
+                echo "Running pre-retry command: $pre_retry_cmd"
+                $pre_retry_cmd
+            fi
             echo "Command failed. Retrying in ${delay}s..."
             sleep $delay
+            delay=$((delay*2))
         fi
     done
 
     echo "Command failed after $retries retries."
-    return 1
+    exit 1
 }
 
 # publisher: 'Canonical'
@@ -55,10 +69,10 @@ function install_deps_ubuntu_2204 {
 }
 
 function install_deps_almalinux_87 {
-    retry_command "dnf install -y mysql-server mysql-libs epel-release"
-    retry_command "dnf install -y jemalloc"
-    systemctl enable mysql
-    systemctl start mysql
+    retry_command "dnf install -y mysql-server mysql-devel epel-release" 5 10 "dnf clean packages"
+    retry_command "dnf install -y jemalloc" 5 10 "dnf clean packages"
+    systemctl enable mysqld
+    systemctl start mysqld
 
     rpm --import https://packages.microsoft.com/keys/microsoft.asc
     DISTRIB_CODENAME=el8
@@ -69,13 +83,13 @@ function install_deps_almalinux_87 {
     echo -e "enabled=1" >> ${REPO_PATH}
     echo -e "gpgcheck=1" >> ${REPO_PATH}
     echo -e "gpgkey=https://packages.microsoft.com/keys/microsoft.asc" >> ${REPO_PATH}
-    sudo dnf install amlfs-lustre-client-2.15.1_24_gbaa21ca-$(uname -r | sed -e "s/\.$(uname -p)$//" | sed -re 's/[-_]/\./g')-1
+    retry_command "dnf install -y amlfs-lustre-client-2.15.1_24_gbaa21ca-$(uname -r | sed -e "s/\.$(uname -p)$//" | sed -re 's/[-_]/\./g')-1" 5 10 "dnf clean packages"
 }
 
 if [ "$os_version" == "ubuntu2004" ]; then
     install_deps_ubuntu_2204
 elif [ "$os_version" == "almalinux87" ]; then
-    install_deps_alma_87
+    install_deps_almalinux_87
 else
     echo "Unsupported OS version: $os_version"
     exit 1
