@@ -11,4 +11,4 @@ git checkout lfsazsync
 
 ./build_plugin.sh
 mv dist lemur
-tar zcvf $$scriptDir/lemur.tgz lemur
+tar zcvf $scriptDir/lemur.tgz lemur

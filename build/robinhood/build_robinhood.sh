@@ -16,4 +16,4 @@ make install
 mkdir -p /opt/robinhood/etc/robinhood.d/includes
 cp doc/templates/includes/lhsm.inc /opt/robinhood/etc/robinhood.d/includes
 cd /opt
-tar zcvf $cd $scriptDir/robinhood.tgz robinhood
+tar zcvf $scriptDir/robinhood.tgz robinhood
