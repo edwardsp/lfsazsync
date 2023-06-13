@@ -3,13 +3,7 @@ FROM almalinux:8.7
 SHELL ["/bin/bash", "-c"]
 
 # It would be great to combine all these ENV into one block, but they aren't interpolated immediately.
-ENV TZ="Etc/UTC" \
-    \
-    USR_INCLUDE="/usr/include" \
-    USR_LIB="/usr/lib" \
-    USR_LOCAL="/usr/local" \
-    \
-    LUSTRE_VER="2.15.1-24-gbaa21ca"
+ENV TZ="Etc/UTC"
 
 # install lustre client
 ENV DISTRIB_CODENAME=el8 \

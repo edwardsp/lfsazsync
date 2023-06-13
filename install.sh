@@ -5,7 +5,7 @@ storage_account="$2"
 storage_sas="$3"
 storage_container="$4"
 ssh_port="$5"
-download_url="$6"
+github_release="$6"
 os_version="$7"
 
 lfs_mount=/amlfs
@@ -100,8 +100,7 @@ fi
 ###############################################
 
 cd /tmp
-wget $download_url/lemur.tgz
-tar zxvf lemur.tgz
+wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release/${os}-lemur.tgz | tar zxf
 cd lemur
 mv azure-import changelog-reader lhsmd /sbin/.
 mkdir -p /usr/libexec/lhsmd
@@ -110,8 +109,7 @@ cd ..
 rmdir lemur
 
 cd /opt
-wget $download_url/robinhood.tgz
-tar zxvf robinhood.tgz
+wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release/${os}-robinhood.tgz | tar zxf
 
 ###############################################
 # mount lustre

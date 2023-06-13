@@ -1,0 +1,33 @@
+FROM mcr.microsoft.com/mirror/docker/library/ubuntu:20.04
+
+SHELL ["/bin/bash", "-c"]
+
+# It would be great to combine all these ENV into one block, but they aren't interpolated immediately.
+ENV DISTRIB_CODENAME="focal" \
+    TZ="Etc/UTC" \
+    DEBIAN_FRONTEND="noninteractive" \
+    LUSTRE_VER="2.15.1-24-gbaa21ca"
+
+ENV LUSTRE_CLIENT_DEB="lustre-client_${LUSTRE_VER}_amd64.deb" \
+    TEMP_DIR="/tmp/lustre"
+
+# Install robinhood dependencies
+RUN apt update 
+RUN apt install -y build-essential git wget libjemalloc-dev libssl-dev \
+    libncurses5-dev pkg-config bison flex libelf-dev bc cpio python3-dev \
+    libtool libreadline-dev rsync gfortran libglib2.0-dev jq gpg gpg-agent \
+    uuid uuid-dev ca-certificates lsb-release curl apt-transport-https \
+    gnupg texinfo cron zstd libnl-genl-3-dev unzip autoconf-archive \
+    libgirepository1.0-dev ubuntu-dbgsym-keyring libmount-dev \
+    mpi-default-dev git automake autoconf libtool
+RUN apt install -y libmysqlclient-dev
+
+# Download and extract the userspace deb from PMC (client util + devel).
+RUN    mkdir -p "${TEMP_DIR}" \
+    && wget "https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/pool/main/l/lustre-client/${LUSTRE_CLIENT_DEB}" \
+            -O "${TEMP_DIR}/${LUSTRE_CLIENT_DEB}" \
+    && dpkg-deb -xv "${TEMP_DIR}/${LUSTRE_CLIENT_DEB}" "/"
+
+# Cleanup to shrink image.
+RUN    rm -rf "${TEMP_DIR}" \
+    && apt-get clean
