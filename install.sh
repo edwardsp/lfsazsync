@@ -100,7 +100,7 @@ fi
 ###############################################
 
 cd /tmp
-wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os_version}-lemur.tgz | tar zxf
+wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os_version}-lemur.tgz | tar zx
 cd lemur
 mv azure-import changelog-reader lhsmd /sbin/.
 mkdir -p /usr/libexec/lhsmd
@@ -109,7 +109,7 @@ cd ..
 rmdir lemur
 
 cd /opt
-wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os_version}-robinhood.tgz | tar zxf
+wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os_version}-robinhood.tgz | tar zx
 
 ###############################################
 # mount lustre

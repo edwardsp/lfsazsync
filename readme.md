@@ -28,19 +28,19 @@ lctl set_param -P "mdt.lustrefs-MDT0000.hsm.active_request_timeout"=432000
 
 The Bicep template has the following parameters:
 
-| Parameter              | Description                                                      |
-| ---------------------- | ---------------------------------------------------------------- |
-| subnet_id              | The ID of the subnet to deploy the virtual machine to            |
-| vm_sku                 | The SKU of the virtual machine to deploy                         | 
-| admin_user             | The username of the administrator account                        |
-| ssh_key                | The public key for the administrator account                     |
-| lustre_mgs             | The IP address/hostname of the Lustre MGS                        |
-| storage_account_name   | The name of the Azure storage account                            |
-| storage_container_name | The container to use for synchonising the data                   |
-| storage_account_key    | A SAS key for the storage account                                |
-| ssh_port               | The port used by sshd on the virtual machine                     |
-| download_url           | The URL where the lemur and robinhood packages can be downloaded |
-| os                     | The OS to use for the VM (options: ubuntu2004 or almalinux87)    |
+| Parameter              | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| subnet_id              | The ID of the subnet to deploy the virtual machine to             |
+| vm_sku                 | The SKU of the virtual machine to deploy                          | 
+| admin_user             | The username of the administrator account                         |
+| ssh_key                | The public key for the administrator account                      |
+| lustre_mgs             | The IP address/hostname of the Lustre MGS                         |
+| storage_account_name   | The name of the Azure storage account                             |
+| storage_container_name | The container to use for synchonising the data                    |
+| storage_account_key    | A SAS key for the storage account                                 |
+| ssh_port               | The port used by sshd on the virtual machine                      |
+| github_release         | Release tag where the robinhood and lemur will be downloaded from |
+| os                     | The OS to use for the VM (options: ubuntu2004 or almalinux87)     |
 
 ```
 # TODO: set the account name and container name below
@@ -84,7 +84,7 @@ storage_account_name=
 storage_container_name=
 storage_sas_key=
 ssh_port=
-download_url=
+github_release=
 os=
 
 az deployment group create \
@@ -100,7 +100,7 @@ az deployment group create \
         storage_container_name=$storage_container_name \
         storage_sas_key="$storage_sas_key" \
         ssh_port=$ssh_port \
-        download_url=$download_url \
+        github_release=$github_release \
         os=$os
 ```
 
