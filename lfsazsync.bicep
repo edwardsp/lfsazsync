@@ -60,7 +60,7 @@ var imageRef = {
 }
 
 var imagePlans = {
-  ubuntu2004: {}
+  ubuntu2004: null
   almalinux87: {
     publisher: 'almalinux'
     product: 'almalinux'
