@@ -12,7 +12,6 @@ lfs_mount=/amlfs
 
 # we still need to disable selinux for the lustremetasync to work
 if [ "$os_version" == "almalinux87" ]; then
-    semanage port -a -t ssh_port_t -p tcp 8822
     setenforce 0
     sed -i 's/SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 fi
@@ -101,7 +100,7 @@ fi
 ###############################################
 
 cd /tmp
-wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os}-lemur.tgz | tar zxf
+wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os_version}-lemur.tgz | tar zxf
 cd lemur
 mv azure-import changelog-reader lhsmd /sbin/.
 mkdir -p /usr/libexec/lhsmd
@@ -110,7 +109,7 @@ cd ..
 rmdir lemur
 
 cd /opt
-wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os}-robinhood.tgz | tar zxf
+wget -O - https://github.com/edwardsp/lfsazsync/releases/download/${github_release}/${os_version}-robinhood.tgz | tar zxf
 
 ###############################################
 # mount lustre
