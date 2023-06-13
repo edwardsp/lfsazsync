@@ -2,10 +2,13 @@
 
 #docker run -it --entrypoint /bin/bash -v $(pwd):/lemur -w /lemur lemur-almalinux-87
 
+scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd $scriptDir
+
 git clone https://github.com/edwardsp/lemur.git
 cd lemur
 git checkout lfsazsync
 
 ./build_plugin.sh
 mv dist lemur
-tar zcvf ../lemur.tar.gz lemur
+tar zcvf $$scriptDir/lemur.tgz lemur
