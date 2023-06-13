@@ -4,6 +4,7 @@
 
 scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $scriptDir
+pwd
 
 git clone https://github.com/cea-hpc/robinhood.git
 cd robinhood
