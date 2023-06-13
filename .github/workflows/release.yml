@@ -28,11 +28,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: get home directory
-        run: echo "home_dir=$(pwd)" >> $GITHUB_ENV
+      - name: get repo dir
+        run: echo "repo_dir=$(pwd)" >> $GITHUB_ENV
 
       - name: fix git detected dubious ownership in repository
-        run: git config --global --add safe.directory ${{ env.home_dir }}/lfsazsync
+        run: git config --global --add safe.directory ${{ env.repo_dir }}
 
       - name: get version tag
         run: echo "version_tag=$(git describe --tags --always --dirty | tr '-' '_')" >> $GITHUB_ENV
@@ -48,7 +48,7 @@ jobs:
         with:
           name: ${{ env.version_tag }}
           files: |
-            ${{ env.home_dir }}/lfsazsync/build/lemur/lemur.tgz
+            ${{ env.repo_dir }}/build/lemur/lemur.tgz
   robinhood:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
@@ -63,11 +63,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: get home directory
-        run: echo "home_dir=$(pwd)" >> $GITHUB_ENV
+      - name: get repo directory
+        run: echo "repo_dir=$(pwd)" >> $GITHUB_ENV
 
       - name: fix git detected dubious ownership in repository
-        run: git config --global --add safe.directory ${{ env.home_dir }}/lfsazsync
+        run: git config --global --add safe.directory ${{ env.repo_dir }}
 
       - name: get version tag
         run: echo "version_tag=$(git describe --tags --always --dirty | tr '-' '_')" >> $GITHUB_ENV
@@ -83,4 +83,4 @@ jobs:
         with:
           name: ${{ env.version_tag }}
           files: |
-            ${{ env.home_dir }}/lfsazsync/build/robinhood/robinhood.tgz
+            ${{ env.repo_dir }}/build/robinhood/robinhood.tgz
