@@ -40,7 +40,7 @@ The Bicep template has the following parameters:
 | storage_account_key    | A SAS key for the storage account                                |
 | ssh_port               | The port used by sshd on the virtual machine                     |
 | download_url           | The URL where the lemur and robinhood packages can be downloaded |
-
+| os                     | The OS to use for the VM (options: ubuntu2004 or almalinux87)    |
 
 ```
 # TODO: set the account name and container name below
@@ -85,6 +85,7 @@ storage_container_name=
 storage_sas_key=
 ssh_port=
 download_url=
+os=
 
 az deployment group create \
     --resource-group $resource_group \
@@ -99,7 +100,8 @@ az deployment group create \
         storage_container_name=$storage_container_name \
         storage_sas_key="$storage_sas_key" \
         ssh_port=$ssh_port \
-        download_url=$download_url
+        download_url=$download_url \
+        os=$os
 ```
 
 After this call completes the virtual machine will be deployed although it will take more time to install and import the metadata from Azure BLOB storage into the Lustre filesystem.  The progress can be monitored by looking at the `/var/log/cloud-init-output.log` file on the virtual machine.

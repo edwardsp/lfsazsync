@@ -6,17 +6,27 @@ storage_sas="$3"
 storage_container="$4"
 ssh_port="$5"
 download_url="$6"
+os_version="$7"
 
 lfs_mount=/amlfs
 
+# we still need to disable selinux for the lustremetasync to work
+if [ "$os_version" == "almalinux87" ]; then
+    setenforce 0
+    sed -i 's/SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
+fi
+
 # change ssh port
-sed -i "s/^#Port 22/Port $ssh_port/" /etc/ssh/sshd_config
-systemctl restart sshd
+if [ "$ssh_port" != "22" ]; then  
+    sed -i "s/^#Port 22/Port $ssh_port/" /etc/ssh/sshd_config
+    systemctl restart sshd
+fi
 
 retry_command() {
     local cmd=$1
     local retries=${2:-5}
     local delay=${3:-10}
+    local pre_retry_cmd=${4:-""}
 
     for ((i=0; i<retries; i++)); do
         echo "Running command: $cmd"
@@ -26,29 +36,68 @@ retry_command() {
             echo "Command succeeded!"
             return 0
         else
+            if [ -n "$pre_retry_cmd" ]; then
+                echo "Running pre-retry command: $pre_retry_cmd"
+                $pre_retry_cmd
+            fi
             echo "Command failed. Retrying in ${delay}s..."
             sleep $delay
+            delay=$((delay*2))
         fi
     done
 
     echo "Command failed after $retries retries."
-    return 1
+    exit 1
 }
+
+# publisher: 'Canonical'
+# offer: '0001-com-ubuntu-server-focal'
+# sku: '20_04-lts-gen2'
+# version: 'latest'
+function install_deps_ubuntu_2204 {
+    retry_command "apt update"
+    retry_command "apt install -y mysql-server libmysqlclient-dev libjemalloc2"
+    systemctl enable mysql
+    systemctl start mysql
+
+    retry_command "apt install -y ca-certificates curl apt-transport-https lsb-release gnupg"
+    source /etc/lsb-release
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/ ${DISTRIB_CODENAME} main" | tee /etc/apt/sources.list.d/amlfs.list
+    curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+    retry_command "apt update"
+    retry_command "apt install -y amlfs-lustre-client-2.15.1-24-gbaa21ca=$(uname -r)"
+}
+
+function install_deps_almalinux_87 {
+    retry_command "dnf install -y mysql-server mysql-devel epel-release" 5 10 "dnf clean packages"
+    retry_command "dnf install -y jemalloc" 5 10 "dnf clean packages"
+    systemctl enable mysqld
+    systemctl start mysqld
+
+    rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    DISTRIB_CODENAME=el8
+    REPO_PATH=/etc/yum.repos.d/amlfs.repo
+    echo -e "[amlfs]" > ${REPO_PATH}
+    echo -e "name=Azure Lustre Packages" >> ${REPO_PATH}
+    echo -e "baseurl=https://packages.microsoft.com/yumrepos/amlfs-${DISTRIB_CODENAME}" >> ${REPO_PATH}
+    echo -e "enabled=1" >> ${REPO_PATH}
+    echo -e "gpgcheck=1" >> ${REPO_PATH}
+    echo -e "gpgkey=https://packages.microsoft.com/keys/microsoft.asc" >> ${REPO_PATH}
+    retry_command "dnf install -y amlfs-lustre-client-2.15.1_24_gbaa21ca-$(uname -r | sed -e "s/\.$(uname -p)$//" | sed -re 's/[-_]/\./g')-1" 5 10 "dnf clean packages"
+}
+
+if [ "$os_version" == "ubuntu2004" ]; then
+    install_deps_ubuntu_2204
+elif [ "$os_version" == "almalinux87" ]; then
+    install_deps_almalinux_87
+else
+    echo "Unsupported OS version: $os_version"
+    exit 1
+fi
 
 ###############################################
 # Install dependencies
 ###############################################
-retry_command "apt update"
-retry_command "apt install -y mysql-server libmysqlclient-dev libjemalloc2"
-systemctl enable mysql
-systemctl start mysql
-
-retry_command "apt install -y ca-certificates curl apt-transport-https lsb-release gnupg"
-source /etc/lsb-release
-echo "deb [arch=amd64] https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/ ${DISTRIB_CODENAME} main" | tee /etc/apt/sources.list.d/amlfs.list
-curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
-retry_command "apt update"
-retry_command "apt install -y amlfs-lustre-client-2.15.1-24-gbaa21ca=$(uname -r)"
 
 cd /tmp
 wget $download_url/lemur.tgz
