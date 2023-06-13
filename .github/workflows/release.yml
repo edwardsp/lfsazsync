@@ -34,7 +34,6 @@ jobs:
       - name: print release name
         run: echo "version tag = ${{ env.version_tag }}"
 
-      # Runs a single command using the runners shell
       - name: build lemur tarball
         run: build/lemur/build_lemur.sh
       
@@ -43,7 +42,7 @@ jobs:
         with:
           name: ${{ env.version_tag }}
           files: |
-            /github/home/lfsazsync/build/lemur/lemur.tgz
+            /__w/lfsazsync/lfsazsync/build/lemur/lemur.tgz
   robinhood:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
@@ -64,8 +63,7 @@ jobs:
       - name: print release name
         run: echo "version tag = ${{ env.version_tag }}"
 
-      # Runs robinhood tarball
-      - name: Build RPMs
+      - name: build robinhood tarball
         run: build/robinhood/build_robinhood.sh
       
       - name: Release
@@ -73,4 +71,4 @@ jobs:
         with:
           name: ${{ env.version_tag }}
           files: |
-            /github/home/lfsazsync/build/robinhood/robinhood.tgz
+            /__w/lfsazsync/lfsazsync/build/robinhood/robinhood.tgz
