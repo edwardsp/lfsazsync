@@ -93,7 +93,7 @@ az deployment group create \
     --parameters \
         subnet_id="$subnet_id" \
         vmsku=$vmsku \
-        admin_user="admin_user" \
+        admin_user="$admin_user" \
         ssh_key="$ssh_key" \
         lustre_mgs=$lustre_mgs \
         storage_account_name=$storage_account_name \
