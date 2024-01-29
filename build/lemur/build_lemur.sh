@@ -10,6 +10,7 @@ git clone https://github.com/edwardsp/lemur.git
 cd lemur
 git checkout lfsazsync
 
+go mod download github.com/edwardsp/go-lustre
 ./build_plugin.sh
 mv dist lemur
 tar zcvf $scriptDir/lemur.tgz lemur
